@@ -169,6 +169,19 @@
       this.input.val('').trigger("keyup");
       this.wrapper.remove();
     }
+  })
+
+  $.widget('bp.multiselectfilter', $.ech.multiselectfilter, {
+    _create: function() {
+      this._super();
+	  this.wrapper.addClass('text-control');
+	  if (this.instance.options.multiple) {
+		  this.wrapper.addClass('border-normal-bottom');
+	  }
+	  else {
+		  this.wrapper.css('padding-bottom', '0px').css('margin-bottom', '0px');
+	  }
+    }
   });
 
 })(jQuery);

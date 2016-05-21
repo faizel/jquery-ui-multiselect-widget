@@ -406,7 +406,7 @@
           $this.closest('label').toggleClass('ui-state-active', checked);
 
           // close menu
-          self.close();
+          //self.close(); [Overridden by blueprint autoClose (see below)]
         }
 
         // fire change on the select box
@@ -755,6 +755,220 @@
 
       $.Widget.prototype._setOption.apply(this, arguments);
     }
+  });
+
+  // Blueprint customizations
+  $.widget("bp.multiselect", $.ech.multiselect, {
+  
+      options: {
+		  didChange: null
+      },
+  
+	  _create: function() {
+		  this._super();
+		  var self = this;
+		  var el = this.element;
+		  var o = this.options;
+
+		  self.button.removeClass('ui-corner-all');
+		  self.menu.removeClass('ui-corner-all');
+		  self.header.removeClass('ui-widget-header ui-corner-all');
+		  self.header.addClass('background-texture border-normal-bottom');
+
+		  self.headerLinkContainer
+		  .addClass('bp-multiselect-helper')
+		  .html(function() {
+			  if(o.header === true) {
+				  return '<li class="bp-multiselect-header"><a class="ui-multiselect-all text-control" href="#"><i class="fa fa-check-square-o fa-lg"></i> ' + o.checkAllText + '</a></li><li class="bp-multiselect-header"><a class="ui-multiselect-none text-control" href="#"><i class="fa fa-square-o fa-lg"></i> ' + o.uncheckAllText + '</a></li>';
+			  } else if(typeof o.header === "string") {
+				  return '<li>' + o.header + '</li>';
+			  } else {
+				  return '';
+			  }
+		  })
+		  .find('a.ui-multiselect-close')
+		  .addClass('text-control')
+		  .html('<span><i class="fa fa-close fa-lg"</i></span>');
+
+		  if (this._isListMode()) {
+			  self.button.find("span.ui-icon").remove();
+			  self.button.css('height', '2.6em');
+			  self.menu.addClass('border-bottom-normal inline');
+			  self.menu.css('border-top', 'none');
+			  self._setButtonWidth();
+			  self._setMenuWidth();
+			  window.setTimeout((function(){ self.open(); }))
+		  }
+		  else {
+			  self.button.addClass('ui-corner-top ui-corner-bottom');
+			  self.menu.addClass('border-bottom-normal ui-corner-bottom ui-corner-top');
+		  }
+		  
+		  if (this.options.notitle) {
+			  self.button.css('height', '0px').css('padding', '0px').css('border-top', '0');
+		  }
+	  },
+	
+	  _init: function() {
+		  this._super();
+	      if(!this.options.multiple) {
+	        this.headerLinkContainer.hide();
+	      }
+	  },
+	  
+	  _isListMode: function() {
+		  return null != this.options.mode && this.options.mode == 'list';
+	  },
+	  
+	  _autoClose: function() {
+		  return null != this.options.autoClose && this.options.autoClose == true;
+	  },
+	  
+	  // set button width
+	  _setButtonWidth: function() {
+		  var width = this.element.outerWidth();
+		  var o = this.options;
+
+		  if(/\d/.test(o.width)) {
+			  this.button.css('width', o.width);
+		  }
+		  else if(/\d/.test(o.minWidth) && width < o.minWidth) {
+			  width = o.minWidth;
+			  this.button.outerWidth(width);
+		  }
+
+	  },
+		
+      _setMenuWidth: function() {
+		  if (!this._isListMode()) {
+			  this._super();
+		  }
+      },
+		
+	  _setOption: function(key, value) {
+		  this._super(key, value);
+		  switch (key) {
+		  case 'width':
+			  this.options[key] = parseInt(value, 10);
+			  this._setButtonWidth();
+			  this._setMenuWidth();
+			  break;
+		  case 'maxHeight':
+	          menu.find('ul').last().css('maxHeight', value);
+	          break;
+		  }
+	  }, 
+		
+	  position: function() {
+		  var o = this.options;
+
+		  // use the position utility if it exists and options are specifified
+		  if($.ui.position && !$.isEmptyObject(o.position)) {
+			  o.position.of = o.position.of || this.button;
+
+			  this.menu
+			  .show()
+			  .position(o.position)
+			  .hide();
+
+			  // otherwise fallback to custom positioning
+		  } else {
+			  var pos = this.button.offset();
+
+			  this.menu.css({
+				  top: pos.top + this.button.outerHeight(),
+				  left: pos.left
+			  });
+		  }
+			
+		  this._setMenuWidth();
+	  },
+		
+	  refresh: function(init) {
+		  var el = this.element;
+
+		  this._super(init);
+			
+		  // build items
+		  this.labels.each(function(i) {
+			  $(this).removeClass('ui-corner-all');
+		  });
+	  },
+		
+	  _bindEvents: function() {
+		  self = this;
+		  
+		  this._super();
+		  if (this._isListMode()) {
+			  this.button.unbind();
+			  this.button.find('span').unbind();
+			  $doc.unbind('mousedown.' + this._namespaceID);
+		  }
+		  
+		  this.menu.delegate('input[type="checkbox"], input[type="radio"]', 'click.multiselect', function(e) {
+			        // some additional single select-specific logic
+			        if(!self.options.multiple) {
+			          if (self._autoClose()) { self.close(); }
+			        }
+		  })
+		  .delegate('label', 'mouseleave.multiselect', function() {
+		          $(this).removeClass('ui-state-hover').find('input').blur();
+		  });
+			  
+		  if (null != this.options.didChange) {
+			  this.element.on('change', didChange);
+		  }
+	  },
+	  
+	  open: function(e) {
+		  var self = this;
+		  var button = this.button;
+		  var menu = this.menu;
+		  var speed = this.speed;
+			
+		  this._super(e);
+			
+		  var menuTop = menu.offset().top;
+		  var buttonBottom = button.offset().top + button.outerHeight();
+		  var delta = Math.abs(menuTop - buttonBottom);
+	  
+		  if (!self._isListMode()) {
+			  if (delta < 5) {
+				  // opening below button
+				  button.removeClass('ui-corner-all').addClass('ui-corner-top');
+				  menu.removeClass('ui-corner-top').addClass('ui-corner-bottom shadowed');
+				  menu.css('border-top', '0px');
+			  }
+			  else {
+				  // opening above button
+				  button.removeClass('ui-corner-all').addClass('ui-corner-bottom');
+				  menu.removeClass('ui-corner-bottom').addClass('ui-corner-top shadowed');
+			  }
+			
+			  button.removeClass('ui-state-active').addClass('shadowed');
+		  }
+		  else {
+			  button.removeClass('ui-state-active');
+			  menu.css({
+				  'top' : 0,
+				  'left' : 0
+			  });
+			  
+			  var maxHeight = self.options.maxHeight;
+			  if (null != maxHeight) {
+		          menu.find('ul').last().css('maxHeight', maxHeight);
+			  }
+		  }
+	  }, 
+		
+	  close: function() {
+		  this._super();
+		  if (!this._isListMode()) {
+			  this.button.removeClass('shadowed').trigger('blur').trigger('mouseleave');
+			  this.button.removeClass('ui-corner-bottom ui-corner-top').addClass('ui-corner-all');
+			  this.menu.removeClass('ui-corner-bottom ui-corner-top shadowed');
+		  }
+	  }
   });
 
 })(jQuery);
